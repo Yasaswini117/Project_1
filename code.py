@@ -1,7 +1,7 @@
 import requests
 import pandas as pd
 
-# GitHub API URL
+# GitHub API URLs
 search_url = "https://api.github.com/search/users"
 user_url = "https://api.github.com/users/"
 
@@ -50,16 +50,21 @@ for user in users:
     
     user_details = user_response.json()
     
-    # Handle potential None values for company and other fields
+    # Handle potential None values for company, location, name, email, and hireable
     company = user_details.get('company')
+    location = user_details.get('location')
+    name = user_details.get('name', '')  # This will return '' if name is None
+    email = user_details.get('email', '')  # Email may be missing
+    hireable = user_details.get('hireable', '')  # Hireable may be missing
+
     user_data.append({
         "login": user['login'],
-        "name": user.get('name', ''),
-        "company": company.strip().lstrip('@').upper() if company else '',  # Only call strip() if company is not None
-        "location": user.get('location', ''),
-        "email": user_details.get('email', ''),
-        "hireable": user_details.get('hireable', ''),
-        "bio": user_details.get('bio', ''),
+        "name": name.strip() if name else '',  # Cleaned name
+        "company": company.strip().lstrip('@').upper() if company else '',  # Cleaned company name
+        "location": location.strip() if location else '',  # Cleaned location
+        "email": email,  # Email value
+        "hireable": hireable,  # Hireable value
+        "bio": user_details.get('bio', ''),  # Bio may be missing
         "public_repos": user_details.get('public_repos', 0),  # Default to 0 if not available
         "followers": user_details.get('followers', 0),        # Default to 0 if not available
         "following": user_details.get('following', 0),        # Default to 0 if not available
@@ -68,8 +73,23 @@ for user in users:
 
 print(f"Total users fetched: {len(user_data)}")  # Debugging statement to show total users fetched
 
-# Save to CSV
+# Create DataFrame
 users_df = pd.DataFrame(user_data)
+
+# Check for missing values
+missing_values = users_df.isnull().sum()
+print("Missing values in the DataFrame:\n", missing_values)
+
+# Count how many fields are missing
+missing_company_count = users_df['company'].isnull().sum()
+missing_email_count = users_df['email'].isnull().sum()
+missing_hireable_count = users_df['hireable'].isnull().sum()
+missing_name_count = users_df['name'].isnull().sum()
+
+print(f"Number of users with missing names: {missing_name_count}")
+print(f"Number of users with missing companies: {missing_company_count}")
+print(f"Number of users with missing email addresses: {missing_email_count}")
+print(f"Number of users with missing hireable status: {missing_hireable_count}")
 
 # Print the DataFrame to check values
 print(users_df.head())  # Debugging statement to check first few rows of DataFrame
