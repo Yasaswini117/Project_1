@@ -2,7 +2,8 @@ import requests
 import pandas as pd
 
 # GitHub API URL
-url = "https://api.github.com/search/users"
+search_url = "https://api.github.com/search/users"
+user_url = "https://api.github.com/users/"
 
 # Set your GitHub token here
 token = "my_token"  # Replace with your actual token
@@ -22,7 +23,7 @@ headers = {
 users = []
 
 while True:
-    response = requests.get(url, headers=headers, params=params)
+    response = requests.get(search_url, headers=headers, params=params)
     
     if response.status_code != 200:
         print(f"Error fetching users: {response.status_code} - {response.text}")
@@ -40,25 +41,42 @@ while True:
 # Create DataFrame and clean the data
 user_data = []
 for user in users:
+    # Fetch additional user details
+    user_response = requests.get(user_url + user['login'], headers=headers)
+    
+    if user_response.status_code != 200:
+        print(f"Error fetching details for user {user['login']}: {user_response.status_code} - {user_response.text}")
+        continue
+    
+    user_details = user_response.json()
+    
+    # Handle potential None values for company and other fields
+    company = user_details.get('company')
     user_data.append({
         "login": user['login'],
         "name": user.get('name', ''),
-        "company": user.get('company', '').strip().lstrip('@').upper(),
+        "company": company.strip().lstrip('@').upper() if company else '',  # Only call strip() if company is not None
         "location": user.get('location', ''),
-        "email": user.get('email', ''),
-        "hireable": user.get('hireable', ''),
-        "bio": user.get('bio', ''),
-        "public_repos": user.get('public_repos', ''),
-        "followers": user.get('followers', ''),
-        "following": user.get('following', ''),
-        "created_at": user.get('created_at', '')
+        "email": user_details.get('email', ''),
+        "hireable": user_details.get('hireable', ''),
+        "bio": user_details.get('bio', ''),
+        "public_repos": user_details.get('public_repos', 0),  # Default to 0 if not available
+        "followers": user_details.get('followers', 0),        # Default to 0 if not available
+        "following": user_details.get('following', 0),        # Default to 0 if not available
+        "created_at": user_details.get('created_at', '')
     })
 
 print(f"Total users fetched: {len(user_data)}")  # Debugging statement to show total users fetched
 
 # Save to CSV
 users_df = pd.DataFrame(user_data)
+
+# Print the DataFrame to check values
+print(users_df.head())  # Debugging statement to check first few rows of DataFrame
+
+# Save cleaned user data to CSV
 users_df.to_csv('users.csv', index=False)
+print(f"User data saved to users.csv with {len(users_df)} records.")
 
 repositories = []
 
@@ -69,7 +87,7 @@ for user in users_df['login']:
         "sort": "pushed"
     }
     
-    repo_response = requests.get(repo_url, headers=headers, params=repo_params)
+    repo_response = requests.get(repo_url, headers=headers)
     
     if repo_response.status_code != 200:
         print(f"Error fetching repositories for {user}: {repo_response.status_code} - {repo_response.text}")
@@ -93,6 +111,7 @@ for user in users_df['login']:
 
 print(f"Total repositories fetched: {len(repositories)}")  # Debugging statement to show total repos fetched
 
-# Save to CSV
+# Save repository data to CSV
 repos_df = pd.DataFrame(repositories)
 repos_df.to_csv('repositories.csv', index=False)
+print(f"Repository data saved to repositories.csv with {len(repos_df)} records.")
